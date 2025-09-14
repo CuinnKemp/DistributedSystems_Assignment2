@@ -14,6 +14,7 @@
         <module>AggregationServer</module>
         <module>ContentServer</module>
         <module>GetClient</module>
+        <module>IntegrationTest</module>
     </modules>
 
     <properties>

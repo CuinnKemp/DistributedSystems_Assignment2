@@ -2,6 +2,7 @@ package com.distributedsystems.shared;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -37,7 +38,7 @@ public class HttpHelper {
         Response res = new Response();
         String statusLine = in.readLine();
         if (statusLine == null || statusLine.isEmpty()) {
-            return null; // server closed
+            throw new IOException("Not Connected to Server");
         }
 
         String[] parts = statusLine.split(" ", 3);
@@ -113,41 +114,39 @@ public class HttpHelper {
         return req;
     }
 
-    public static void sendResponse(PrintWriter out, String status, int lamport,  String body) {
+    public static void sendResponse(PrintWriter out, String status, int lamport, String body) {
+        if (body == null) body = "";
+        byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+
         out.println("HTTP/1.1 " + status);
-        out.println("Content-Type: application/json");
+        out.println("Content-Type: application/json; charset=UTF-8");
         out.println("X-Lamport-Clock: " + lamport);
-        out.println("Content-Length: " + body.length());
+        out.println("Content-Length: " + bodyBytes.length);
         out.println();
-        out.print(body);
+        out.write(body);
         out.flush();
     }
 
     public static Response sendRequest(Socket socket, String method, String path, Map<String, String> headers, String body) throws IOException {
-        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
         if (body == null) body = "";
+        byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
         if (headers == null) headers = new HashMap<>();
+
+        PrintWriter out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
+        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
 
         out.println(method + " " + path + " HTTP/1.1");
 
-        if (!headers.containsKey("Host")) {
-            headers.put("Host", socket.getInetAddress().getHostName());
-        }
-        if (!headers.containsKey("Content-Length")) {
-            headers.put("Content-Length", String.valueOf(body.length()));
-        }
+        headers.putIfAbsent("Host", socket.getInetAddress().getHostName());
+        headers.put("Content-Length", String.valueOf(bodyBytes.length));
 
-        // Write headers
         for (Map.Entry<String, String> entry : headers.entrySet()) {
             out.println(entry.getKey() + ": " + entry.getValue());
         }
         out.println();
 
-        // Write body if present
-        if (!body.isEmpty()) {
-            out.print(body);
+        if (bodyBytes.length > 0) {
+            out.write(body);
         }
         out.flush();
 

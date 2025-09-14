@@ -78,6 +78,7 @@ public class ClientHandler implements Runnable {
         try {
             Map<String, String> json = SimpleJsonUtil.parse(req.body);
             String stationId = json.get("id");
+            System.out.println("Handling PUT from " + stationId);
             int requestLamport = Integer.parseInt(req.headers.getOrDefault("X-Lamport-Clock", "0"));
             clock.update(requestLamport);
 
@@ -86,7 +87,8 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
-            FileManager.UpdateResult result = fileManager.updateStation(stationId, clock.get(), json);
+            // update file using lamport from request - ensures most recent update is always the update available
+            FileManager.UpdateResult result = fileManager.updateStation(stationId, requestLamport, json);
 
             switch (result) {
                 case CREATED:
@@ -104,7 +106,7 @@ public class ClientHandler implements Runnable {
             }
 
         } catch (Exception e) {
-            HttpHelper.sendResponse(out, "500 Internal Server Error", clock.get(), "Invalid JSON");
+            HttpHelper.sendResponse(out, "500 Internal Server Error", clock.get(), "");
         }
     }
 
